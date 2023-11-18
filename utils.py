@@ -77,8 +77,11 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
 
 def get_norm_stats(dataset_dir, num_episodes):
+    mask = []
     all_qpos_data = []
     all_action_data = []
+    
+    longest_data = 0
     for episode_idx in range(num_episodes):
         dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with h5py.File(dataset_path, 'r') as root:
@@ -87,19 +90,51 @@ def get_norm_stats(dataset_dir, num_episodes):
             action = root['/action'][()]
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
-    all_qpos_data = torch.stack(all_qpos_data)
-    all_action_data = torch.stack(all_action_data)
-    all_action_data = all_action_data
 
-    # normalize action data
-    action_mean = all_action_data.mean(dim=[0, 1], keepdim=True)
-    action_std = all_action_data.std(dim=[0, 1], keepdim=True)
-    action_std = torch.clip(action_std, 1e-2, np.inf) # clipping
+        if len(qpos) > longest_data:
+            longest_data = qpos.shape[0]
+    
+    # pad all data to longest data
+    padded_qpos = torch.zeros((longest_data, qpos.shape[1]))
+    padded_action = torch.zeros((longest_data, action.shape[1]))
+    for i in range(num_episodes):
+        qpos = all_qpos_data[i]
+        action = all_action_data[i]
+        padded_qpos = torch.zeros((longest_data, qpos.shape[1]))
+        padded_action = torch.zeros((longest_data, action.shape[1]))
+        padded_qpos[:qpos.shape[0]] = qpos
+        padded_action[:action.shape[0]] = action
+        all_qpos_data[i] = padded_qpos
+        all_action_data[i] = padded_action
 
-    # normalize qpos data
-    qpos_mean = all_qpos_data.mean(dim=[0, 1], keepdim=True)
-    qpos_std = all_qpos_data.std(dim=[0, 1], keepdim=True)
-    qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
+        # Create masks
+        mask.append(torch.cat([torch.ones_like(qpos), torch.zeros((longest_data - qpos.shape[0], qpos.shape[1]))]))
+
+    mask = torch.stack(mask)
+    all_qpos_data = padded_qpos
+    all_action_data = padded_action
+
+    # Calculate the sum of the data, ignoring the zeros
+    sum_action_data = (all_action_data * mask).sum(dim=[0, 1], keepdim=True)
+    sum_qpos_data = (all_qpos_data * mask).sum(dim=[0, 1], keepdim=True)
+
+    # Calculate the number of non-zero values
+    num_non_zero_action = mask.sum(dim=[0, 1], keepdim=True)
+    num_non_zero_qpos = mask.sum(dim=[0, 1], keepdim=True)
+
+    # Calculate the mean, ignoring the zeros
+    action_mean = sum_action_data / num_non_zero_action
+    qpos_mean = sum_qpos_data / num_non_zero_qpos
+
+    # Calculate the standard deviation, ignoring the zeros
+    action_var = ((all_action_data - action_mean) ** 2 * mask).sum(dim=[0, 1], keepdim=True) / num_non_zero_action
+    qpos_var = ((all_qpos_data - qpos_mean) ** 2 * mask).sum(dim=[0, 1], keepdim=True) / num_non_zero_qpos
+    action_std = torch.sqrt(action_var)
+    qpos_std = torch.sqrt(qpos_var)
+
+    # Clip the standard deviations
+    action_std = torch.clip(action_std, 1e-2, np.inf)
+    qpos_std = torch.clip(qpos_std, 1e-2, np.inf)
 
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
