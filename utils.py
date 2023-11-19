@@ -7,6 +7,32 @@ from torch.utils.data import TensorDataset, DataLoader
 import IPython
 e = IPython.embed
 
+
+def collate_fn_padd(batch):
+    '''
+    Padds batch of variable length
+
+    note: it converts things ToTensor manually here since the ToTensor transform
+    assume it takes in images rather than arbitrary tensors.
+    '''
+    # Separate the data into separate lists
+    image_data_list, qpos_data_list, action_data_list, is_pad_list = zip(*batch)
+
+    # Get sequence lengths
+    lengths = torch.tensor([ t.shape[0] for t in image_data_list ])
+
+    # Pad each list separately
+    image_data = torch.nn.utils.rnn.pad_sequence([torch.Tensor(t) for t in image_data_list], batch_first=True)
+    qpos_data = torch.nn.utils.rnn.pad_sequence([torch.Tensor(t) for t in qpos_data_list], batch_first=True)
+    action_data = torch.nn.utils.rnn.pad_sequence([torch.Tensor(t) for t in action_data_list], batch_first=True)
+    is_pad = torch.nn.utils.rnn.pad_sequence([torch.Tensor(t) for t in is_pad_list], batch_first=True)
+
+    # Compute mask
+    mask = (image_data != 0)
+
+    return image_data, qpos_data, action_data, is_pad, lengths, mask
+
+
 class EpisodicDataset(torch.utils.data.Dataset):
     def __init__(self, episode_ids, dataset_dir, camera_names, norm_stats):
         super(EpisodicDataset).__init__()
@@ -157,8 +183,8 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
     # construct dataset and dataloader
     train_dataset = EpisodicDataset(train_indices, dataset_dir, camera_names, norm_stats)
     val_dataset = EpisodicDataset(val_indices, dataset_dir, camera_names, norm_stats)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1, collate_fn=collate_fn_padd)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1, collate_fn=collate_fn_padd)
 
     return train_dataloader, val_dataloader, norm_stats, train_dataset.is_sim
 

@@ -323,9 +323,11 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
 
 def forward_pass(data, policy):
-    image_data, qpos_data, action_data, is_pad = data
+    image_data, qpos_data, action_data, is_pad, lengths, mask = data
     # image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.to('cuda', dtype=torch.float32), action_data.to('cuda', dtype=torch.float32), is_pad.cuda()
-    image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda()
+    image_data, qpos_data, action_data, is_pad, lengths, mask = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda(), lengths.cuda(), mask.cuda()
+    # TODO CALEB ~ Return here and figure out where we need to use the mask.
+    # return policy(qpos_data, image_data, action_data, is_pad), lengths, mask # TODO remove None
     return policy(qpos_data, image_data, action_data, is_pad) # TODO remove None
 
 
