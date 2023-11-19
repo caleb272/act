@@ -36,6 +36,12 @@ SIM_TASK_CONFIGS = {
         'episode_len': 1000,
         'camera_names': ['cam_high', 'cam_low', 'cam_left_wrist', 'cam_right_wrist']
     },
+    'sim_stack_block_400_scripted': {
+        'dataset_dir': DATA_DIR + '/stack_block_session_length_400',
+        'num_episodes': 50,
+        'episode_len': 400,
+        'camera_names': ['cam_high', 'cam_low', 'cam_left_wrist', 'cam_right_wrist']
+    },
 }
 
 ### Simulation envs fixed constants

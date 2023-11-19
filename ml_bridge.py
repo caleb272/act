@@ -62,7 +62,7 @@ class MLBridge:
 
         return np.array(joint_commands)
     
-    def write_observation(self, qpos: np.array, camera_array: Tuple[np.array, np.array, np.array, np.array, np.array]):
+    def write_observation(self, qpos: np.array, camera_array: Tuple[np.array, np.array, np.array, np.array]):
         entry_index = self.get_current_entry_index()  # Get the current index
 
         data = struct.pack('d'*len(qpos), *qpos)
