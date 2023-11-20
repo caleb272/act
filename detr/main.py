@@ -65,6 +65,9 @@ def get_args_parser():
     parser.add_argument('--chunk_size', action='store', type=int, help='chunk_size', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
 
+    # My args
+    parser.add_argument('--variable_length', action='store_true')
+
     return parser
 
 

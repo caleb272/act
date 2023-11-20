@@ -33,6 +33,7 @@ def main(args):
     batch_size_train = args['batch_size']
     batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
+    variable_length_data = args['variable_length']
 
     # get task parameters
     is_sim = task_name[:4] == 'sim_'
@@ -103,7 +104,7 @@ def main(args):
         print()
         exit()
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val)
+    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val, variable_length=variable_length_data)
 
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
@@ -324,11 +325,8 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
 def forward_pass(data, policy):
     image_data, qpos_data, action_data, is_pad, lengths, mask = data
-    # image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.to('cuda', dtype=torch.float32), action_data.to('cuda', dtype=torch.float32), is_pad.cuda()
     image_data, qpos_data, action_data, is_pad, lengths, mask = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda(), lengths.cuda(), mask.cuda()
-    # TODO CALEB ~ Return here and figure out where we need to use the mask.
-    # return policy(qpos_data, image_data, action_data, is_pad), lengths, mask # TODO remove None
-    return policy(qpos_data, image_data, action_data, is_pad) # TODO remove None
+    return policy(qpos_data, image_data, action_data, is_pad), lengths, mask  # TODO remove None
 
 
 def train_bc(train_dataloader, val_dataloader, config):
@@ -444,5 +442,8 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dim', action='store', type=int, help='hidden_dim', required=False)
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
+
+    # My flags
+    parser.add_argument('--variable_length', action='store_true')
     
     main(vars(parser.parse_args()))
