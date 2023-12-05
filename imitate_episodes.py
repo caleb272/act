@@ -325,8 +325,10 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
 def forward_pass(data, policy):
     image_data, qpos_data, action_data, is_pad, lengths, mask = data
+    # print(is_pad.shape, mask.shape)
+    # assert torch.all((is_pad == 0) == mask)
     image_data, qpos_data, action_data, is_pad, lengths, mask = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda(), lengths.cuda(), mask.cuda()
-    return policy(qpos_data, image_data, action_data, is_pad), lengths, mask  # TODO remove None
+    return policy(qpos_data, image_data, action_data, is_pad) # TODO remove None
 
 
 def train_bc(train_dataloader, val_dataloader, config):
@@ -355,6 +357,7 @@ def train_bc(train_dataloader, val_dataloader, config):
             for batch_idx, data in enumerate(val_dataloader):
                 forward_dict = forward_pass(data, policy)
                 epoch_dicts.append(forward_dict)
+            # print('i get here: ', epoch_dicts)
             epoch_summary = compute_dict_mean(epoch_dicts)
             validation_history.append(epoch_summary)
 
