@@ -2,7 +2,9 @@ import mmap
 import struct
 import numpy as np
 from typing import Tuple
-import os
+import socketio
+# import logging
+# import threading
 
 MMAP_JOINT_POSE_COMMAND_PATH = "/tmp/ark_joint_commands"
 MMAP_OBSERVATIONS_PATH = "/tmp/ark_observations"
@@ -16,23 +18,25 @@ OBSERVATIONS_FILE_SIZE = OBSERVATION_BUFFER_ENTRY_SIZE * OBSERVATION_BUFFER_ENTR
 # IMPORTANT YOU MUST HAVE LOTS OF RAM OR ENABLE OVERCOMMIT MEMORY ON THE RUNNING MACHINE
 # the following command should return 1 if it doesn't you need to enable overcommit
 # cat /proc/sys/vm/overcommit_memory
+
+
 class MLBridge:
     def __init__(self):
-        pass
+        self.sio = socketio.SimpleClient()
+        self.sim_state = [0.0]
     
     def open(self):
-        # for file_with_info in [(MMAP_OBSERVATIONS_PATH, OBSERVATIONS_FILE_SIZE), (MMAP_JOINT_POSE_COMMAND_PATH, JOINT_POSE_FILE_SIZE)]:
-        #     filename, file_size = file_with_info
-        #     with open(filename, "wb") as f:
-        #         f.seek(file_size - 1)
-        #         f.write(b'\0')
-        #         print('created file ', filename, ' with size ', f.tell())
-
+        self.sio.connect('http://0.0.0.0:5555')
         with open(MMAP_JOINT_POSE_COMMAND_PATH, "r+b") as f:
             self.joint_pos_commands_mmap = mmap.mmap(f.fileno(), JOINT_POSE_FILE_SIZE)
         with open(MMAP_OBSERVATIONS_PATH, "r") as f:
             self.observations_mmap = mmap.mmap(f.fileno(), OBSERVATIONS_FILE_SIZE, access=mmap.ACCESS_READ)
-
+    
+    def _setup_socketio(self):
+        self.sio = socketio.Server(cors_allowed_origins="*", async_mode='threading')
+        # self.sio.on('reset', self._handle_reset)
+        # self.app = Flask("vr_server")
+        # self.app.wsgi_app = socketio.WSGIApp(self.sio, self.app.wsgi_app)
 
     def read_joint_command(self, joint_index):
         # Check if the joint index is valid
@@ -75,6 +79,19 @@ class MLBridge:
         self.observations_mmap[start:start+len(data)] = data
         self.observations_mmap[-1] = entry_index  # Update the current index
     
+    def reset_sim(self) -> float:
+        self.sio.emit('reset')
+        # do this twice to flush the whole interprocess communication circular buffer.
+        self.write_joint_commands(np.zeros(14))
+        self.write_joint_commands(np.zeros(14))
+        reset_completed = self.sio.receive(timeout=5)
+
+        if reset_completed is not None:
+            message, data = reset_completed
+
+            if message == 'reset_completed':
+                return data['reward']
+    
     def read_observations(self) -> dict:
         observations = dict()
         images = dict()
@@ -84,9 +101,10 @@ class MLBridge:
         end = start + OBSERVATION_BUFFER_ENTRY_SIZE
         data = self.observations_mmap[start:end]
         qpos = struct.unpack('d'*14, data[0:14*8])
+        sim_state = struct.unpack('d'*1, data[14*8:15*8])
         camera_array = []
         for i in range(4):
-            start = 8*14 + i*OBSERVATION_IMAGE_SIZE
+            start = 9*14 + i*OBSERVATION_IMAGE_SIZE
             end = start + OBSERVATION_IMAGE_SIZE
             camera_array.append(np.frombuffer(data[start:end], dtype=np.uint8).reshape((480, 640, 3)))
 
@@ -98,8 +116,8 @@ class MLBridge:
         observations['qpos'] = np.array(qpos)
         observations['images'] = images
             
-        return observations
-    
+        return observations, sim_state
+   
     def write_joint_commands(self, joint_commands: np.array):
         #  Convert the joint_commands to bytes using struct.pack
         joint_commands_bytes = struct.pack('14d', *joint_commands)
