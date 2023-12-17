@@ -33,9 +33,23 @@ SIM_TASK_CONFIGS = {
     'sim_stack_block_scripted': {
         'dataset_dir': DATA_DIR + '/stack_block',
         'num_episodes': 5,
-        # 'episode_len': 400,
-        'episode_len': 500,
+        'episode_len': 400,
+        # 'episode_len': 500,
         # 'episode_len': 100,
+        'camera_names': ['cam_high', 'cam_low', 'cam_left_wrist', 'cam_right_wrist']
+    },
+    'sim_stack_block_scripted_one_actuated_finger_old_setup': {
+        'dataset_dir': DATA_DIR + '/stack_block_session_length_400_one_finger_actuated_old_setup',
+        'num_episodes': 50,
+        'episode_len': 400,
+        # 'episode_len': 500,
+        # 'episode_len': 100,
+        'camera_names': ['cam_high', 'cam_low', 'cam_left_wrist', 'cam_right_wrist']
+    },
+    'sim_stack_block_scripted_one_actuated_finger_random_start_position': {
+        'dataset_dir': DATA_DIR + '/stack_block_session_length_400_one_finger_actuated_random_start_position',
+        'num_episodes': 50,
+        'episode_len': 400,
         'camera_names': ['cam_high', 'cam_low', 'cam_left_wrist', 'cam_right_wrist']
     },
 }
